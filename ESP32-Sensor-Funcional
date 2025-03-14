@@ -1,0 +1,73 @@
+from machine import Pin, time_pulse_us
+import time
+import requests
+import network
+import json
+
+ssid = 'Alumnes'
+password = 'edu71243080'
+
+SOUND_SPEED=340 # Vitesse du son dans l'air
+TRIG_PULSE_DURATION_US=10
+
+trig_pin = Pin(5, Pin.OUT)
+echo_pin = Pin(18, Pin.IN)
+
+url_busy = f"http://172.16.4.231:5000/api/position/busy"
+url_empty = f"http://172.16.4.231:5000/api/position/empty"
+
+connection = network.WLAN(network.STA_IF)
+`
+connection.active(True)
+
+try:
+    connection.connect(ssid, password)
+except OSError as ex:
+    print(ex)
+
+while connection.isconnected() == False:
+    pass
+
+if connection.isconnected():
+    print('Connection succesfully')
+
+while True:
+    # Prepare le signal
+    trig_pin.value(0)
+    time.sleep_us(5)
+    # Créer une impulsion de 10 µs
+    trig_pin.value(1)
+    time.sleep_us(TRIG_PULSE_DURATION_US)
+    trig_pin.value(0)
+
+    ultrason_duration = time_pulse_us(echo_pin, 1, 30000) # Renvoie le temps de propagation de l'onde (en µs)
+    distance_cm = SOUND_SPEED * ultrason_duration / 20000
+    
+    response = None
+
+    if distance_cm <= 2:
+        response = requests.post(url_busy, data=json.dumps({'position':'P1'}))
+        '''try:
+            
+        except OSError as ex:
+            print(ex)'''
+    
+        if response.status_code == 200:
+            print("Response: ",response.json())
+        else:
+            print("Error: ",response.status_code)
+    elif distance_cm >= 5:
+        response = requests.post(url_empty, data=json.dumps({'position':'P2'}))
+        '''try:
+            
+        except OSError as ex:
+            print(ex)'''
+    
+        if response.status_code == 200:
+            print("Response: ",response.json())
+        else:
+            print("Error: ",response.status_code)
+
+    print(f"Distance : {distance_cm} cm")
+    time.sleep_ms(500)
+
